@@ -1,0 +1,13 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: notifyhub
+      POSTGRES_USER: notifyhub
+      POSTGRES_PASSWORD: localdev
+    ports:
+      - "5433:5432"  # 5432 is taken by a system Postgres 18 install (postgresql-18.plist)
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+volumes:
+  pgdata:
