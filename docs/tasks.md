@@ -19,9 +19,9 @@ Ordered top to bottom. Work sequentially.
 - [ ] Verify all eleven apply cleanly against a fresh database
 
 ## 2. Repository / data access layer
-- [ ] Entity classes for all seven public-schema tables, ddl-auto: validate
-- [ ] Repository interfaces (Spring Data JPA)
-- [ ] Document camelCase <-> snake_case alias strategy once, in common/
+- [x] Entity classes for all seven public-schema tables, ddl-auto: validate
+- [x] Repository interfaces (Spring Data JPA)
+- [x] Document camelCase <-> snake_case alias strategy once, in common/
 
 ## 3. Bare CRUD endpoints, no auth
 - [ ] POST /campaigns, GET /campaigns/{id}

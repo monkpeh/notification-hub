@@ -29,7 +29,7 @@ Update this line as phases change. Don't let it silently go stale.
   database. Every schema change is a new V{n}__description.sql file in
   src/main/resources/db/migration. Never edit an already-committed migration -
   add a new one.
-- Package structure: com.jkmonkpeh.notifyhub.{campaign,template,config,window,
+- Package structure: com.notifyhub.notifyhub.{campaign,template,config,window,
   user,editrequest,audit,security,common} - one package per domain concept.
 - Entity fields use camelCase; columns use snake_case. Alias mapping is
   centralized in common/, not repeated per entity.

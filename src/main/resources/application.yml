@@ -4,10 +4,8 @@ spring:
     username: notifyhub
     password: localdev
   jpa:
+    open-in-view: false
     hibernate:
       ddl-auto: validate
   flyway:
     enabled: true
-  spring:
-    jpa:
-      open-in-view: false

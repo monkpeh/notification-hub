@@ -225,7 +225,7 @@ set approved_with_override=true on the edit_request row.
 
 ## Package structure
 
-com.jkmonkpeh.notifyhub
+com.notifyhub.notifyhub
   campaign/     CampaignEntity, repository, service, controller
   template/     TemplateEntity (self-referencing), repository, service
   config/       TemplateConfigEntity, repository, service
@@ -267,3 +267,27 @@ layer, not the service layer.
 Phase 1 uses a minimal custom AuthFilter reading a pid header, resolved to
 an app_user row. Swappable for Cognito in Phase 4 without touching the RBAC
 guard logic.
+
+## camelCase / snake_case alias convention
+
+Every entity in this project follows the same rule: Java fields are
+camelCase, database columns are snake_case, and the mapping between them
+is always explicit via @Column(name = "..."). There is no reliance on
+Hibernate's default naming strategy to infer the conversion.
+
+Example: TemplateEntity.templateName maps to template.template_name via
+@Column(name = "template_name") - not left to Hibernate's
+ImplicitNamingStrategy/PhysicalNamingStrategy to guess.
+
+Why explicit over automatic: an implicit strategy works fine until a
+column name doesn't follow the expected pattern (e.g. an existing column
+abbreviated unusually, or a future migration adding a column with a name
+that doesn't cleanly reverse-convert). Explicit @Column names mean the
+mapping is always visible in the entity itself, and a schema mismatch
+surfaces immediately via ddl-auto: validate rather than silently mapping
+to the wrong column or failing in a way that's hard to trace back to the
+naming strategy.
+
+This is why every entity in this project explicitly names every column,
+even when the camelCase-to-snake_case conversion would have been
+unambiguous either way.
