@@ -24,11 +24,11 @@ Ordered top to bottom. Work sequentially.
 - [x] Document camelCase <-> snake_case alias strategy once, in common/
 
 ## 3. Bare CRUD endpoints, no auth
-- [ ] POST /campaigns, GET /campaigns/{id}
-- [ ] POST /templates, PUT /templates/{id}
-- [ ] POST /templates/{id}/configs
-- [ ] POST /configs/{id}/windows
-- [ ] Manually verify parent-child cascade and FK integrity in DBeaver
+- [x] POST /campaigns, GET /campaigns/{id}
+- [x] POST /templates, PUT /templates/{id}
+- [x] POST /templates/{id}/configs
+- [x] POST /configs/{id}/windows
+- [x] Manually verify parent-child cascade and FK integrity in DBeaver
 
 ## 4. RBAC
 - [ ] AuthFilter reads pid header, resolves to app_user
