@@ -1,5 +1,6 @@
 package com.notifyhub.campaign;
 
+import com.notifyhub.common.FieldValidationService;
 import com.notifyhub.security.RequireRole;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -11,14 +12,18 @@ import org.springframework.web.server.ResponseStatusException;
 public class CampaignController {
 
     private final CampaignRepository campaignRepository;
+    private final FieldValidationService fieldValidationService;
 
-    public CampaignController(CampaignRepository campaignRepository) {
+    public CampaignController(CampaignRepository campaignRepository, FieldValidationService fieldValidationService) {
         this.campaignRepository = campaignRepository;
+        this.fieldValidationService = fieldValidationService;
     }
 
     @PostMapping
     @RequireRole({"SUPER_ADMIN", "ADMIN"})
     public ResponseEntity<CampaignResponse> create(@RequestBody CreateCampaignRequest request) {
+        fieldValidationService.validateCampaignCreate(request);
+
         CampaignEntity entity = new CampaignEntity(
             request.name(),
             request.businessPurpose(),
