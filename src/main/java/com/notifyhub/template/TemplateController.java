@@ -1,5 +1,6 @@
 package com.notifyhub.template;
 
+import com.notifyhub.common.FieldValidationService;
 import com.notifyhub.security.RequireRole;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -11,14 +12,18 @@ import org.springframework.web.server.ResponseStatusException;
 public class TemplateController {
 
     private final TemplateRepository templateRepository;
+    private final FieldValidationService fieldValidationService;
 
-    public TemplateController(TemplateRepository templateRepository) {
+    public TemplateController(TemplateRepository templateRepository, FieldValidationService fieldValidationService) {
         this.templateRepository = templateRepository;
+        this.fieldValidationService = fieldValidationService;
     }
 
     @PostMapping
     @RequireRole({"SUPER_ADMIN", "ADMIN", "TEMPLATE_BUILDER", "AI_AGENT"})
     public ResponseEntity<TemplateResponse> create(@RequestBody CreateTemplateRequest request) {
+        fieldValidationService.validateTemplateCreate(request);
+
         TemplateEntity entity = new TemplateEntity(
             request.campaignId(),
             request.parentTemplateId(),
