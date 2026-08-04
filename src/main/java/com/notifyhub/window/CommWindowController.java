@@ -1,5 +1,6 @@
 package com.notifyhub.window;
 
+import com.notifyhub.security.RequireRole;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -15,6 +16,7 @@ public class CommWindowController {
     }
 
     @PostMapping
+    @RequireRole({"SUPER_ADMIN", "ADMIN", "TEMPLATE_BUILDER", "AI_AGENT"})
     public ResponseEntity<CommWindowResponse> create(@PathVariable Long configId,
                                                        @RequestBody CreateCommWindowRequest request) {
         CommWindowEntity entity = new CommWindowEntity(

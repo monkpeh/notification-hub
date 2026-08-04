@@ -1,5 +1,6 @@
 package com.notifyhub.template;
 
+import com.notifyhub.security.RequireRole;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -16,6 +17,7 @@ public class TemplateController {
     }
 
     @PostMapping
+    @RequireRole({"SUPER_ADMIN", "ADMIN", "TEMPLATE_BUILDER", "AI_AGENT"})
     public ResponseEntity<TemplateResponse> create(@RequestBody CreateTemplateRequest request) {
         TemplateEntity entity = new TemplateEntity(
             request.campaignId(),
@@ -34,6 +36,7 @@ public class TemplateController {
     }
 
     @PutMapping("/{id}")
+    @RequireRole({"SUPER_ADMIN", "ADMIN", "TEMPLATE_BUILDER", "AI_AGENT"})
     public TemplateResponse update(@PathVariable Long id, @RequestBody UpdateTemplateRequest request) {
         TemplateEntity entity = templateRepository.findById(id)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Template not found: " + id));
