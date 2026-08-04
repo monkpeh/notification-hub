@@ -1,5 +1,6 @@
 package com.notifyhub.campaign;
 
+import com.notifyhub.security.RequireRole;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -16,6 +17,7 @@ public class CampaignController {
     }
 
     @PostMapping
+    @RequireRole({"SUPER_ADMIN", "ADMIN"})
     public ResponseEntity<CampaignResponse> create(@RequestBody CreateCampaignRequest request) {
         CampaignEntity entity = new CampaignEntity(
             request.name(),
