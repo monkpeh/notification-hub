@@ -1,9 +1,11 @@
 package com.notifyhub.common;
 
 import com.notifyhub.campaign.CreateCampaignRequest;
+import com.notifyhub.config.CreateTemplateConfigRequest;
 import com.notifyhub.template.CreateTemplateRequest;
 import com.notifyhub.template.TemplateEntity;
 import com.notifyhub.template.TemplateRepository;
+import com.notifyhub.window.CreateCommWindowRequest;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -16,6 +18,7 @@ public class FieldValidationService {
 
     private static final Set<String> CAMPAIGN_STATUSES = Set.of("ACTIVE", "INACTIVE");
     private static final Set<String> TEMPLATE_STATUSES = Set.of("Y", "N");
+    private static final Set<String> COMMUNICATION_MEDIUMS = Set.of("EMAIL", "SMS", "IVR", "PUSH", "RCS");
 
     private final TemplateRepository templateRepository;
 
@@ -66,7 +69,6 @@ public class FieldValidationService {
             errors.add(new ValidationError("status", request.status(), "must be one of " + TEMPLATE_STATUSES));
         }
 
-        // REQ-2: hierarchy rules
         if (request.isParent()) {
             if (request.parentTemplateId() != null) {
                 errors.add(new ValidationError("parentTemplateId", request.parentTemplateId(),
@@ -86,6 +88,47 @@ public class FieldValidationService {
                         "must reference a template where isParent is true — max hierarchy depth is 1"));
                 }
             }
+        }
+
+        if (!errors.isEmpty()) {
+            throw new FieldValidationException(errors);
+        }
+    }
+
+    public void validateTemplateConfigCreate(CreateTemplateConfigRequest request) {
+        List<ValidationError> errors = new ArrayList<>();
+
+        if (request.communicationMedium() == null || !COMMUNICATION_MEDIUMS.contains(request.communicationMedium())) {
+            errors.add(new ValidationError("communicationMedium", request.communicationMedium(),
+                "must be one of " + COMMUNICATION_MEDIUMS));
+        }
+
+        if ("IVR".equals(request.communicationMedium())
+            && (request.contactFlowId() == null || request.contactFlowId().isBlank())) {
+            errors.add(new ValidationError("contactFlowId", request.contactFlowId(),
+                "required when communicationMedium is IVR"));
+        }
+
+        if (!errors.isEmpty()) {
+            throw new FieldValidationException(errors);
+        }
+    }
+
+    public void validateCommWindowCreate(CreateCommWindowRequest request) {
+        List<ValidationError> errors = new ArrayList<>();
+
+        if (request.startWindow() == null) {
+            errors.add(new ValidationError("startWindow", null, "must not be null"));
+        }
+
+        if (request.endWindow() == null) {
+            errors.add(new ValidationError("endWindow", null, "must not be null"));
+        }
+
+        if (request.startWindow() != null && request.endWindow() != null
+            && !request.startWindow().isBefore(request.endWindow())) {
+            errors.add(new ValidationError("startWindow", request.startWindow(),
+                "must be before endWindow"));
         }
 
         if (!errors.isEmpty()) {
