@@ -5,11 +5,13 @@ import com.notifyhub.config.CreateTemplateConfigRequest;
 import com.notifyhub.template.CreateTemplateRequest;
 import com.notifyhub.template.TemplateEntity;
 import com.notifyhub.template.TemplateRepository;
+import com.notifyhub.template.UpdateTemplateRequest;
 import com.notifyhub.window.CreateCommWindowRequest;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -19,6 +21,7 @@ public class FieldValidationService {
     private static final Set<String> CAMPAIGN_STATUSES = Set.of("ACTIVE", "INACTIVE");
     private static final Set<String> TEMPLATE_STATUSES = Set.of("Y", "N");
     private static final Set<String> COMMUNICATION_MEDIUMS = Set.of("EMAIL", "SMS", "IVR", "PUSH", "RCS");
+    private static final Set<String> IMMUTABLE_TEMPLATE_FIELDS = Set.of("isParent", "eventType", "campaignId", "parentTemplateId");
 
     private final TemplateRepository templateRepository;
 
@@ -88,6 +91,39 @@ public class FieldValidationService {
                         "must reference a template where isParent is true — max hierarchy depth is 1"));
                 }
             }
+        }
+
+        if (!errors.isEmpty()) {
+            throw new FieldValidationException(errors);
+        }
+    }
+
+    public void validateNoImmutableFieldsInUpdate(Map<String, Object> rawBody) {
+        List<ValidationError> errors = new ArrayList<>();
+
+        for (String field : IMMUTABLE_TEMPLATE_FIELDS) {
+            if (rawBody.containsKey(field)) {
+                errors.add(new ValidationError(field, rawBody.get(field),
+                    "field is immutable after template creation and cannot be modified via update"));
+            }
+        }
+
+        if (!errors.isEmpty()) {
+            throw new FieldValidationException(errors);
+        }
+    }
+
+    public void validateTemplateUpdate(UpdateTemplateRequest request) {
+        List<ValidationError> errors = new ArrayList<>();
+
+        if (request.templateName() == null || request.templateName().isBlank()) {
+            errors.add(new ValidationError("templateName", request.templateName(), "must not be blank"));
+        } else if (request.templateName().length() > 150) {
+            errors.add(new ValidationError("templateName", request.templateName(), "must be 150 characters or fewer"));
+        }
+
+        if (request.status() == null || !TEMPLATE_STATUSES.contains(request.status())) {
+            errors.add(new ValidationError("status", request.status(), "must be one of " + TEMPLATE_STATUSES));
         }
 
         if (!errors.isEmpty()) {

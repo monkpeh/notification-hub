@@ -1,5 +1,6 @@
 package com.notifyhub.template;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.notifyhub.common.FieldValidationService;
 import com.notifyhub.security.RequireRole;
 import org.springframework.http.HttpStatus;
@@ -7,16 +8,20 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.Map;
+
 @RestController
 @RequestMapping("/templates")
 public class TemplateController {
 
     private final TemplateRepository templateRepository;
     private final FieldValidationService fieldValidationService;
+    private final ObjectMapper objectMapper;
 
-    public TemplateController(TemplateRepository templateRepository, FieldValidationService fieldValidationService) {
+    public TemplateController(TemplateRepository templateRepository, FieldValidationService fieldValidationService, ObjectMapper objectMapper) {
         this.templateRepository = templateRepository;
         this.fieldValidationService = fieldValidationService;
+        this.objectMapper = objectMapper;
     }
 
     @PostMapping
@@ -42,7 +47,12 @@ public class TemplateController {
 
     @PutMapping("/{id}")
     @RequireRole({"SUPER_ADMIN", "ADMIN", "TEMPLATE_BUILDER", "AI_AGENT"})
-    public TemplateResponse update(@PathVariable Long id, @RequestBody UpdateTemplateRequest request) {
+    public TemplateResponse update(@PathVariable Long id, @RequestBody Map<String, Object> rawBody) {
+        fieldValidationService.validateNoImmutableFieldsInUpdate(rawBody);
+
+        UpdateTemplateRequest request = objectMapper.convertValue(rawBody, UpdateTemplateRequest.class);
+        fieldValidationService.validateTemplateUpdate(request);
+
         TemplateEntity entity = templateRepository.findById(id)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Template not found: " + id));
 
