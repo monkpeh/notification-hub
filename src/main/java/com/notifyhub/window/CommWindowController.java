@@ -1,6 +1,7 @@
 package com.notifyhub.window;
 
 import com.notifyhub.common.FieldValidationService;
+import com.notifyhub.security.RateLimited;
 import com.notifyhub.security.RequireRole;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -20,6 +21,7 @@ public class CommWindowController {
 
     @PostMapping
     @RequireRole({"SUPER_ADMIN", "ADMIN", "TEMPLATE_BUILDER", "AI_AGENT"})
+    @RateLimited
     public ResponseEntity<CommWindowResponse> create(@PathVariable Long configId,
                                                        @RequestBody CreateCommWindowRequest request) {
         fieldValidationService.validateCommWindowCreate(request);

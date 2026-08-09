@@ -7,6 +7,7 @@ import com.notifyhub.editrequest.EditRequestResponse;
 import com.notifyhub.editrequest.EditRequestService;
 import com.notifyhub.security.CurrentUser;
 import com.notifyhub.security.CurrentUserContext;
+import com.notifyhub.security.RateLimited;
 import com.notifyhub.security.RequireRole;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -45,6 +46,7 @@ public class TemplateController {
 
     @PostMapping
     @RequireRole({"SUPER_ADMIN", "ADMIN", "TEMPLATE_BUILDER", "AI_AGENT"})
+    @RateLimited
     public ResponseEntity<TemplateResponse> create(@RequestBody CreateTemplateRequest request) {
         fieldValidationService.validateTemplateCreate(request);
 
@@ -66,6 +68,7 @@ public class TemplateController {
 
     @PutMapping("/{id}")
     @RequireRole({"SUPER_ADMIN", "ADMIN", "TEMPLATE_BUILDER", "AI_AGENT"})
+    @RateLimited
     public ResponseEntity<?> update(@PathVariable Long id, @RequestBody Map<String, Object> rawBody) {
         fieldValidationService.validateNoImmutableFieldsInUpdate(rawBody);
 

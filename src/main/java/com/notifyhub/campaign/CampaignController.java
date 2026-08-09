@@ -1,6 +1,7 @@
 package com.notifyhub.campaign;
 
 import com.notifyhub.common.FieldValidationService;
+import com.notifyhub.security.RateLimited;
 import com.notifyhub.security.RequireRole;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -21,6 +22,7 @@ public class CampaignController {
 
     @PostMapping
     @RequireRole({"SUPER_ADMIN", "ADMIN"})
+    @RateLimited
     public ResponseEntity<CampaignResponse> create(@RequestBody CreateCampaignRequest request) {
         fieldValidationService.validateCampaignCreate(request);
 
