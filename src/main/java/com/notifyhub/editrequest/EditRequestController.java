@@ -25,19 +25,21 @@ public class EditRequestController {
                                            @RequestParam(required = false) OffsetDateTime dateFrom,
                                            @RequestParam(required = false) OffsetDateTime dateTo) {
         return editRequestService.findFiltered(status, templateId, dateFrom, dateTo).stream()
-            .map(EditRequestResponse::from)
+            .map(editRequestService::toResponse)
             .toList();
     }
 
     @PostMapping("/{id}/approve")
-    public EditRequestResponse approve(@PathVariable Long id) {
+    public EditRequestResponse approve(@PathVariable Long id, @RequestParam(defaultValue = "false") boolean force) {
         CurrentUser currentUser = CurrentUserContext.get();
-        return EditRequestResponse.from(editRequestService.approve(id, currentUser));
+        EditRequestEntity approved = editRequestService.approve(id, currentUser, force);
+        return editRequestService.toResponse(approved);
     }
 
     @PostMapping("/{id}/reject")
     public EditRequestResponse reject(@PathVariable Long id) {
         CurrentUser currentUser = CurrentUserContext.get();
-        return EditRequestResponse.from(editRequestService.reject(id, currentUser));
+        EditRequestEntity rejected = editRequestService.reject(id, currentUser);
+        return editRequestService.toResponse(rejected);
     }
 }

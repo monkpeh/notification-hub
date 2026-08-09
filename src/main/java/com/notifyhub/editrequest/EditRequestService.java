@@ -56,21 +56,37 @@ public class EditRequestService {
         return editRequestRepository.findAll(spec);
     }
 
-    public EditRequestEntity approve(Long id, CurrentUser resolvedBy) {
+    public EditRequestResponse toResponse(EditRequestEntity request) {
+        boolean stale = "PENDING".equals(request.getStatus())
+            ? computeLiveStaleness(request)
+            : request.isApprovedWithOverride();
+        return EditRequestResponse.from(request, stale);
+    }
+
+    public EditRequestEntity approve(Long id, CurrentUser resolvedBy, boolean force) {
         EditRequestEntity request = getPendingOrThrow(id);
 
-        if ("template".equals(request.getTableName())) {
-            TemplateEntity entity = templateRepository.findById(request.getRecordId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Template not found: " + request.getRecordId()));
-            applyTemplateFieldChange(entity, request.getFieldName(), request.getNewValue());
-            templateRepository.save(entity);
-        } else {
+        if (!"template".equals(request.getTableName())) {
             throw new ResponseStatusException(HttpStatus.NOT_IMPLEMENTED, "Approval not yet supported for table: " + request.getTableName());
         }
+
+        TemplateEntity entity = templateRepository.findById(request.getRecordId())
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Template not found: " + request.getRecordId()));
+
+        String currentValue = extractTemplateFieldValue(entity, request.getFieldName());
+        boolean stale = !Objects.equals(currentValue, request.getOldValue());
+
+        if (stale && !force) {
+            throw new StaleEditConflictException(currentValue, request.getOldValue(), request.getNewValue());
+        }
+
+        applyTemplateFieldChange(entity, request.getFieldName(), request.getNewValue());
+        templateRepository.save(entity);
 
         request.setStatus("APPROVED");
         request.setResolvedBy(resolvedBy.userId());
         request.setResolvedAt(OffsetDateTime.now());
+        request.setApprovedWithOverride(stale);
         return editRequestRepository.save(request);
     }
 
@@ -83,6 +99,15 @@ public class EditRequestService {
         return editRequestRepository.save(request);
     }
 
+    private boolean computeLiveStaleness(EditRequestEntity request) {
+        if (!"template".equals(request.getTableName())) {
+            return false;
+        }
+        return templateRepository.findById(request.getRecordId())
+            .map(entity -> !Objects.equals(extractTemplateFieldValue(entity, request.getFieldName()), request.getOldValue()))
+            .orElse(false);
+    }
+
     private EditRequestEntity getPendingOrThrow(Long id) {
         EditRequestEntity request = editRequestRepository.findById(id)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Edit request not found: " + id));
@@ -92,6 +117,19 @@ public class EditRequestService {
         }
 
         return request;
+    }
+
+    private String extractTemplateFieldValue(TemplateEntity entity, String fieldName) {
+        Object value = switch (fieldName) {
+            case "templateName" -> entity.getTemplateName();
+            case "templateDescription" -> entity.getTemplateDescription();
+            case "customerType" -> entity.getCustomerType();
+            case "language" -> entity.getLanguage();
+            case "priority" -> entity.getPriority();
+            case "status" -> entity.getStatus();
+            default -> null;
+        };
+        return value == null ? null : value.toString();
     }
 
     private void applyTemplateFieldChange(TemplateEntity entity, String fieldName, String newValue) {

@@ -13,9 +13,10 @@ public record EditRequestResponse(
     String status,
     String reason,
     OffsetDateTime requestedAt,
-    String targetSchema
+    String targetSchema,
+    boolean stale
 ) {
-    public static EditRequestResponse from(EditRequestEntity entity) {
+    public static EditRequestResponse from(EditRequestEntity entity, boolean stale) {
         return new EditRequestResponse(
             entity.getId(),
             entity.getTableName(),
@@ -27,7 +28,8 @@ public record EditRequestResponse(
             entity.getStatus(),
             entity.getReason(),
             entity.getRequestedAt(),
-            entity.getTargetSchema()
+            entity.getTargetSchema(),
+            stale
         );
     }
 }

@@ -95,7 +95,7 @@ public class TemplateController {
             return ResponseEntity.ok(TemplateResponse.from(entity));
         }
 
-        List<EditRequestResponse> response = pending.stream().map(EditRequestResponse::from).toList();
+        List<EditRequestResponse> response = pending.stream().map(er -> EditRequestResponse.from(er, false)).toList();
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(response);
     }
 }
