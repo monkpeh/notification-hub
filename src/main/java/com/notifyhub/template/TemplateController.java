@@ -2,26 +2,45 @@ package com.notifyhub.template;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.notifyhub.common.FieldValidationService;
+import com.notifyhub.editrequest.EditRequestEntity;
+import com.notifyhub.editrequest.EditRequestResponse;
+import com.notifyhub.editrequest.EditRequestService;
+import com.notifyhub.security.CurrentUser;
+import com.notifyhub.security.CurrentUserContext;
 import com.notifyhub.security.RequireRole;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @RestController
 @RequestMapping("/templates")
 public class TemplateController {
 
+    private static final Set<String> TIER_1_ROLES = Set.of("SUPER_ADMIN", "ADMIN");
+
     private final TemplateRepository templateRepository;
     private final FieldValidationService fieldValidationService;
+    private final EditRequestService editRequestService;
     private final ObjectMapper objectMapper;
 
-    public TemplateController(TemplateRepository templateRepository, FieldValidationService fieldValidationService, ObjectMapper objectMapper) {
+    public TemplateController(TemplateRepository templateRepository, FieldValidationService fieldValidationService,
+                               EditRequestService editRequestService, ObjectMapper objectMapper) {
         this.templateRepository = templateRepository;
         this.fieldValidationService = fieldValidationService;
+        this.editRequestService = editRequestService;
         this.objectMapper = objectMapper;
+    }
+
+    @GetMapping("/{id}")
+    public TemplateResponse getById(@PathVariable Long id) {
+        TemplateEntity entity = templateRepository.findById(id)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Template not found: " + id));
+        return TemplateResponse.from(entity);
     }
 
     @PostMapping
@@ -47,7 +66,7 @@ public class TemplateController {
 
     @PutMapping("/{id}")
     @RequireRole({"SUPER_ADMIN", "ADMIN", "TEMPLATE_BUILDER", "AI_AGENT"})
-    public TemplateResponse update(@PathVariable Long id, @RequestBody Map<String, Object> rawBody) {
+    public ResponseEntity<?> update(@PathVariable Long id, @RequestBody Map<String, Object> rawBody) {
         fieldValidationService.validateNoImmutableFieldsInUpdate(rawBody);
 
         UpdateTemplateRequest request = objectMapper.convertValue(rawBody, UpdateTemplateRequest.class);
@@ -56,14 +75,27 @@ public class TemplateController {
         TemplateEntity entity = templateRepository.findById(id)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Template not found: " + id));
 
-        entity.setTemplateName(request.templateName());
-        entity.setTemplateDescription(request.templateDescription());
-        entity.setCustomerType(request.customerType());
-        entity.setLanguage(request.language());
-        entity.setPriority(request.priority());
-        entity.setStatus(request.status());
+        CurrentUser currentUser = CurrentUserContext.get();
 
-        TemplateEntity saved = templateRepository.save(entity);
-        return TemplateResponse.from(saved);
+        if (TIER_1_ROLES.contains(currentUser.roleName())) {
+            entity.setTemplateName(request.templateName());
+            entity.setTemplateDescription(request.templateDescription());
+            entity.setCustomerType(request.customerType());
+            entity.setLanguage(request.language());
+            entity.setPriority(request.priority());
+            entity.setStatus(request.status());
+
+            TemplateEntity saved = templateRepository.save(entity);
+            return ResponseEntity.ok(TemplateResponse.from(saved));
+        }
+
+        List<EditRequestEntity> pending = editRequestService.createPendingTemplateEdits(entity, request, currentUser);
+
+        if (pending.isEmpty()) {
+            return ResponseEntity.ok(TemplateResponse.from(entity));
+        }
+
+        List<EditRequestResponse> response = pending.stream().map(EditRequestResponse::from).toList();
+        return ResponseEntity.status(HttpStatus.ACCEPTED).body(response);
     }
 }

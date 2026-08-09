@@ -6,5 +6,6 @@ public record UpdateTemplateRequest(
     String customerType,
     String language,
     Integer priority,
-    String status
+    String status,
+    String reason
 ) {}
