@@ -1,11 +1,11 @@
 spring:
-  datasource:
-    url: jdbc:postgresql://localhost:5433/notifyhub
-    username: notifyhub
-    password: localdev
   jpa:
     open-in-view: false
     hibernate:
       ddl-auto: validate
+  datasource:
+    url: jdbc:postgresql://localhost:5433/notifyhub
+    username: notifyhub
+    password: localdev
   flyway:
     enabled: true

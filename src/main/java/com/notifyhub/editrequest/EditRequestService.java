@@ -172,7 +172,7 @@ public class EditRequestService {
             newValue == null ? null : newValue.toString(),
             requestedBy.userId(),
             reason,
-            "public"
+            com.notifyhub.security.TenantContext.get()
         );
 
         created.add(editRequestRepository.save(entity));

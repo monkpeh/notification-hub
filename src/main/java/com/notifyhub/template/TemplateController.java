@@ -104,7 +104,7 @@ public class TemplateController {
 
             TemplateEntity saved = templateRepository.save(entity);
 
-            auditLogService.recordBatch("template", saved.getId(), changes, currentUser.userId(), request.reason(), null, "public");
+            auditLogService.recordBatch("template", saved.getId(), changes, currentUser.userId(), request.reason(), null, com.notifyhub.security.TenantContext.get());
 
             return ResponseEntity.ok(TemplateResponse.from(saved));
         }
