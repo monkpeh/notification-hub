@@ -1,5 +1,6 @@
 package com.notifyhub.editrequest;
 
+import com.notifyhub.audit.AuditLogService;
 import com.notifyhub.common.FieldValidationException;
 import com.notifyhub.common.ValidationError;
 import com.notifyhub.security.CurrentUser;
@@ -21,10 +22,13 @@ public class EditRequestService {
 
     private final EditRequestRepository editRequestRepository;
     private final TemplateRepository templateRepository;
+    private final AuditLogService auditLogService;
 
-    public EditRequestService(EditRequestRepository editRequestRepository, TemplateRepository templateRepository) {
+    public EditRequestService(EditRequestRepository editRequestRepository, TemplateRepository templateRepository,
+                               AuditLogService auditLogService) {
         this.editRequestRepository = editRequestRepository;
         this.templateRepository = templateRepository;
+        this.auditLogService = auditLogService;
     }
 
     public List<EditRequestEntity> createPendingTemplateEdits(TemplateEntity current, UpdateTemplateRequest request, CurrentUser requestedBy) {
@@ -82,6 +86,16 @@ public class EditRequestService {
 
         applyTemplateFieldChange(entity, request.getFieldName(), request.getNewValue());
         templateRepository.save(entity);
+
+        auditLogService.recordBatch(
+            "template",
+            entity.getId(),
+            List.of(new AuditLogService.FieldChange(request.getFieldName(), currentValue, request.getNewValue())),
+            resolvedBy.userId(),
+            request.getReason(),
+            request.getId(),
+            request.getTargetSchema()
+        );
 
         request.setStatus("APPROVED");
         request.setResolvedBy(resolvedBy.userId());

@@ -1,6 +1,7 @@
 package com.notifyhub.template;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.notifyhub.audit.AuditLogService;
 import com.notifyhub.common.FieldValidationService;
 import com.notifyhub.editrequest.EditRequestEntity;
 import com.notifyhub.editrequest.EditRequestResponse;
@@ -14,8 +15,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 @RestController
@@ -27,13 +30,16 @@ public class TemplateController {
     private final TemplateRepository templateRepository;
     private final FieldValidationService fieldValidationService;
     private final EditRequestService editRequestService;
+    private final AuditLogService auditLogService;
     private final ObjectMapper objectMapper;
 
     public TemplateController(TemplateRepository templateRepository, FieldValidationService fieldValidationService,
-                               EditRequestService editRequestService, ObjectMapper objectMapper) {
+                               EditRequestService editRequestService, AuditLogService auditLogService,
+                               ObjectMapper objectMapper) {
         this.templateRepository = templateRepository;
         this.fieldValidationService = fieldValidationService;
         this.editRequestService = editRequestService;
+        this.auditLogService = auditLogService;
         this.objectMapper = objectMapper;
     }
 
@@ -81,6 +87,14 @@ public class TemplateController {
         CurrentUser currentUser = CurrentUserContext.get();
 
         if (TIER_1_ROLES.contains(currentUser.roleName())) {
+            List<AuditLogService.FieldChange> changes = new ArrayList<>();
+            addIfChanged(changes, "templateName", entity.getTemplateName(), request.templateName());
+            addIfChanged(changes, "templateDescription", entity.getTemplateDescription(), request.templateDescription());
+            addIfChanged(changes, "customerType", entity.getCustomerType(), request.customerType());
+            addIfChanged(changes, "language", entity.getLanguage(), request.language());
+            addIfChanged(changes, "priority", entity.getPriority(), request.priority());
+            addIfChanged(changes, "status", entity.getStatus(), request.status());
+
             entity.setTemplateName(request.templateName());
             entity.setTemplateDescription(request.templateDescription());
             entity.setCustomerType(request.customerType());
@@ -89,6 +103,9 @@ public class TemplateController {
             entity.setStatus(request.status());
 
             TemplateEntity saved = templateRepository.save(entity);
+
+            auditLogService.recordBatch("template", saved.getId(), changes, currentUser.userId(), request.reason(), null, "public");
+
             return ResponseEntity.ok(TemplateResponse.from(saved));
         }
 
@@ -100,5 +117,14 @@ public class TemplateController {
 
         List<EditRequestResponse> response = pending.stream().map(er -> EditRequestResponse.from(er, false)).toList();
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(response);
+    }
+
+    private void addIfChanged(List<AuditLogService.FieldChange> changes, String fieldName, Object oldValue, Object newValue) {
+        if (Objects.equals(oldValue, newValue)) {
+            return;
+        }
+        changes.add(new AuditLogService.FieldChange(fieldName,
+            oldValue == null ? null : oldValue.toString(),
+            newValue == null ? null : newValue.toString()));
     }
 }
