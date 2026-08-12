@@ -3,6 +3,7 @@ package com.notifyhub.editrequest;
 import com.notifyhub.audit.AuditLogService;
 import com.notifyhub.common.FieldValidationException;
 import com.notifyhub.common.ValidationError;
+import com.notifyhub.integrity.IntegrityCheckService;
 import com.notifyhub.security.CurrentUser;
 import com.notifyhub.template.TemplateEntity;
 import com.notifyhub.template.TemplateRepository;
@@ -23,12 +24,14 @@ public class EditRequestService {
     private final EditRequestRepository editRequestRepository;
     private final TemplateRepository templateRepository;
     private final AuditLogService auditLogService;
+    private final IntegrityCheckService integrityCheckService;
 
     public EditRequestService(EditRequestRepository editRequestRepository, TemplateRepository templateRepository,
-                               AuditLogService auditLogService) {
+                               AuditLogService auditLogService, IntegrityCheckService integrityCheckService) {
         this.editRequestRepository = editRequestRepository;
         this.templateRepository = templateRepository;
         this.auditLogService = auditLogService;
+        this.integrityCheckService = integrityCheckService;
     }
 
     public List<EditRequestEntity> createPendingTemplateEdits(TemplateEntity current, UpdateTemplateRequest request, CurrentUser requestedBy) {
@@ -96,6 +99,8 @@ public class EditRequestService {
             request.getId(),
             request.getTargetSchema()
         );
+
+        integrityCheckService.runScan();
 
         request.setStatus("APPROVED");
         request.setResolvedBy(resolvedBy.userId());
@@ -172,7 +177,7 @@ public class EditRequestService {
             newValue == null ? null : newValue.toString(),
             requestedBy.userId(),
             reason,
-            com.notifyhub.security.TenantContext.get()
+            "public"
         );
 
         created.add(editRequestRepository.save(entity));
