@@ -6,6 +6,7 @@ import com.notifyhub.common.FieldValidationService;
 import com.notifyhub.editrequest.EditRequestEntity;
 import com.notifyhub.editrequest.EditRequestResponse;
 import com.notifyhub.editrequest.EditRequestService;
+import com.notifyhub.integrity.IntegrityCheckService;
 import com.notifyhub.security.CurrentUser;
 import com.notifyhub.security.CurrentUserContext;
 import com.notifyhub.security.RateLimited;
@@ -31,15 +32,17 @@ public class TemplateController {
     private final FieldValidationService fieldValidationService;
     private final EditRequestService editRequestService;
     private final AuditLogService auditLogService;
+    private final IntegrityCheckService integrityCheckService;
     private final ObjectMapper objectMapper;
 
     public TemplateController(TemplateRepository templateRepository, FieldValidationService fieldValidationService,
                                EditRequestService editRequestService, AuditLogService auditLogService,
-                               ObjectMapper objectMapper) {
+                               IntegrityCheckService integrityCheckService, ObjectMapper objectMapper) {
         this.templateRepository = templateRepository;
         this.fieldValidationService = fieldValidationService;
         this.editRequestService = editRequestService;
         this.auditLogService = auditLogService;
+        this.integrityCheckService = integrityCheckService;
         this.objectMapper = objectMapper;
     }
 
@@ -105,6 +108,7 @@ public class TemplateController {
             TemplateEntity saved = templateRepository.save(entity);
 
             auditLogService.recordBatch("template", saved.getId(), changes, currentUser.userId(), request.reason(), null, com.notifyhub.security.TenantContext.get());
+            integrityCheckService.runScan();
 
             return ResponseEntity.ok(TemplateResponse.from(saved));
         }
