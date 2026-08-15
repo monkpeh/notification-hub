@@ -20,7 +20,8 @@ public class IntegrityCheckService {
         "PARENT_POINTS_TO_CHILD", "HIGH",
         "MISSING_ACTIVE_CONFIG", "HIGH",
         "IVR_MISSING_CONTACT_FLOW", "HIGH",
-        "CHILD_COUNT_ANOMALY", "LOW"
+        "CHILD_COUNT_ANOMALY", "LOW",
+        "SHADOWED_CHILD_TEMPLATE", "HIGH"
     );
 
     private record ViolationKey(String checkType, String tableName, Long recordId) {}
@@ -99,7 +100,32 @@ public class IntegrityCheckService {
             }
         }
 
+        Map<Long, List<TemplateEntity>> childrenByParent = templates.stream()
+            .filter(t -> !t.isParent() && t.getParentTemplateId() != null)
+            .collect(Collectors.groupingBy(TemplateEntity::getParentTemplateId));
+        for (List<TemplateEntity> siblings : childrenByParent.values()) {
+            for (TemplateEntity a : siblings) {
+                for (TemplateEntity b : siblings) {
+                    if (a.getId().equals(b.getId())) continue;
+                    if (isShadowedBy(a, b)) {
+                        record(detected, detailsByKey, "SHADOWED_CHILD_TEMPLATE", "template", a.getId(),
+                            "unreachable - sibling template " + b.getId() + " has broader targeting "
+                                + "(customerType=" + b.getCustomerType() + ", language=" + b.getLanguage()
+                                + ", priority=" + b.getPriority() + " vs this template's priority=" + a.getPriority() + ")");
+                        break;
+                    }
+                }
+            }
+        }
+
         return reconcile(targetSchema, detected, detailsByKey);
+    }
+
+    private boolean isShadowedBy(TemplateEntity a, TemplateEntity b) {
+        boolean customerTypeBroaderOrEqual = b.getCustomerType() == null || Objects.equals(b.getCustomerType(), a.getCustomerType());
+        boolean languageBroaderOrEqual = b.getLanguage() == null || Objects.equals(b.getLanguage(), a.getLanguage());
+        boolean identicalTargeting = Objects.equals(a.getCustomerType(), b.getCustomerType()) && Objects.equals(a.getLanguage(), b.getLanguage());
+        return customerTypeBroaderOrEqual && languageBroaderOrEqual && !identicalTargeting;
     }
 
     public List<IntegrityViolationEntity> findFiltered(String status, String checkType, String targetSchema) {
