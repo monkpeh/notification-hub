@@ -1,10 +1,14 @@
 package com.notifyhub.integrity;
 
+import com.notifyhub.campaign.CampaignEntity;
+import com.notifyhub.campaign.CampaignRepository;
 import com.notifyhub.config.TemplateConfigEntity;
 import com.notifyhub.config.TemplateConfigRepository;
 import com.notifyhub.security.TenantContext;
 import com.notifyhub.template.TemplateEntity;
 import com.notifyhub.template.TemplateRepository;
+import com.notifyhub.window.CommWindowEntity;
+import com.notifyhub.window.CommWindowRepository;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
@@ -21,20 +25,27 @@ public class IntegrityCheckService {
         "MISSING_ACTIVE_CONFIG", "HIGH",
         "IVR_MISSING_CONTACT_FLOW", "HIGH",
         "CHILD_COUNT_ANOMALY", "LOW",
-        "SHADOWED_CHILD_TEMPLATE", "HIGH"
+        "SHADOWED_CHILD_TEMPLATE", "HIGH",
+        "CAMPAIGN_TARGET_OVERLAP", "MEDIUM"
     );
 
     private record ViolationKey(String checkType, String tableName, Long recordId) {}
 
     private final TemplateRepository templateRepository;
     private final TemplateConfigRepository templateConfigRepository;
+    private final CommWindowRepository commWindowRepository;
+    private final CampaignRepository campaignRepository;
     private final IntegrityViolationRepository integrityViolationRepository;
 
     public IntegrityCheckService(TemplateRepository templateRepository,
                                   TemplateConfigRepository templateConfigRepository,
+                                  CommWindowRepository commWindowRepository,
+                                  CampaignRepository campaignRepository,
                                   IntegrityViolationRepository integrityViolationRepository) {
         this.templateRepository = templateRepository;
         this.templateConfigRepository = templateConfigRepository;
+        this.commWindowRepository = commWindowRepository;
+        this.campaignRepository = campaignRepository;
         this.integrityViolationRepository = integrityViolationRepository;
     }
 
@@ -43,6 +54,8 @@ public class IntegrityCheckService {
 
         List<TemplateEntity> templates = templateRepository.findAll();
         List<TemplateConfigEntity> configs = templateConfigRepository.findAll();
+        List<CommWindowEntity> windows = commWindowRepository.findAll();
+        List<CampaignEntity> campaigns = campaignRepository.findAll();
 
         Map<Long, TemplateEntity> templateById = templates.stream()
             .collect(Collectors.toMap(TemplateEntity::getId, t -> t));
@@ -118,6 +131,38 @@ public class IntegrityCheckService {
             }
         }
 
+        Map<Long, List<CommWindowEntity>> windowsByConfig = windows.stream()
+            .collect(Collectors.groupingBy(CommWindowEntity::getConfigId));
+        Map<Long, List<CommWindowEntity>> windowsByTemplate = new HashMap<>();
+        for (TemplateConfigEntity c : configs) {
+            windowsByTemplate.computeIfAbsent(c.getTemplateId(), k -> new ArrayList<>())
+                .addAll(windowsByConfig.getOrDefault(c.getId(), List.of()));
+        }
+
+        Map<Long, List<TemplateEntity>> childrenByCampaign = templates.stream()
+            .filter(t -> !t.isParent())
+            .collect(Collectors.groupingBy(TemplateEntity::getCampaignId));
+        List<CampaignEntity> activeCampaigns = campaigns.stream()
+            .filter(c -> "ACTIVE".equals(c.getStatus()))
+            .toList();
+
+        for (int i = 0; i < activeCampaigns.size(); i++) {
+            for (int j = i + 1; j < activeCampaigns.size(); j++) {
+                CampaignEntity c1 = activeCampaigns.get(i);
+                CampaignEntity c2 = activeCampaigns.get(j);
+                List<TemplateEntity> t1s = childrenByCampaign.getOrDefault(c1.getId(), List.of());
+                List<TemplateEntity> t2s = childrenByCampaign.getOrDefault(c2.getId(), List.of());
+
+                String overlapDetail = findOverlap(t1s, t2s, windowsByTemplate);
+                if (overlapDetail != null) {
+                    record(detected, detailsByKey, "CAMPAIGN_TARGET_OVERLAP", "campaign", c1.getId(),
+                        "overlaps with campaign " + c2.getId() + " (\"" + c2.getName() + "\") - " + overlapDetail);
+                    record(detected, detailsByKey, "CAMPAIGN_TARGET_OVERLAP", "campaign", c2.getId(),
+                        "overlaps with campaign " + c1.getId() + " (\"" + c1.getName() + "\") - " + overlapDetail);
+                }
+            }
+        }
+
         return reconcile(targetSchema, detected, detailsByKey);
     }
 
@@ -126,6 +171,41 @@ public class IntegrityCheckService {
         boolean languageBroaderOrEqual = b.getLanguage() == null || Objects.equals(b.getLanguage(), a.getLanguage());
         boolean identicalTargeting = Objects.equals(a.getCustomerType(), b.getCustomerType()) && Objects.equals(a.getLanguage(), b.getLanguage());
         return customerTypeBroaderOrEqual && languageBroaderOrEqual && !identicalTargeting;
+    }
+
+    private String findOverlap(List<TemplateEntity> t1s, List<TemplateEntity> t2s, Map<Long, List<CommWindowEntity>> windowsByTemplate) {
+        for (TemplateEntity t1 : t1s) {
+            for (TemplateEntity t2 : t2s) {
+                boolean customerTypeOverlaps = t1.getCustomerType() == null || t2.getCustomerType() == null
+                    || Objects.equals(t1.getCustomerType(), t2.getCustomerType());
+                boolean languageOverlaps = t1.getLanguage() == null || t2.getLanguage() == null
+                    || Objects.equals(t1.getLanguage(), t2.getLanguage());
+
+                if (customerTypeOverlaps && languageOverlaps
+                    && windowsOverlap(windowsByTemplate.getOrDefault(t1.getId(), List.of()),
+                                       windowsByTemplate.getOrDefault(t2.getId(), List.of()))) {
+                    return "template " + t1.getId() + " and template " + t2.getId()
+                        + " target overlapping segments in overlapping windows";
+                }
+            }
+        }
+        return null;
+    }
+
+    private boolean windowsOverlap(List<CommWindowEntity> aWindows, List<CommWindowEntity> bWindows) {
+        // No windows defined = treated as unrestricted/always-active, not "no data to compare."
+        if (aWindows.isEmpty() || bWindows.isEmpty()) {
+            return true;
+        }
+        for (CommWindowEntity a : aWindows) {
+            for (CommWindowEntity b : bWindows) {
+                boolean disjoint = !a.getEndWindow().isAfter(b.getStartWindow()) || !b.getEndWindow().isAfter(a.getStartWindow());
+                if (!disjoint) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     public List<IntegrityViolationEntity> findFiltered(String status, String checkType, String targetSchema) {
